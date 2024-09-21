@@ -2,21 +2,18 @@ section .data
     input_file db "/home/mrr79/Documents/HistogramaArqui/prueba.txt", 0
     output_file db "word_counts.txt", 0
     buffer_size equ 1024
+    delimiters db " ", 0
     word_count dd 0
 
 section .bss
     buffer resb buffer_size
-    words resb 256 * 200  ; Buffer para almacenar hasta 200 palabras de 256 bytes cada una
-    counts resd 200       ; Contadores para cada palabra
+    words resb 256 * 200  ; Buffer para almacenar hasta 20 palabras de 256 bytes cada una
+    counts resd 20       ; Contadores para cada palabra
 
 section .text
     global _start
 
 _start:
-    ; Inicializar punteros antes de usarlos
-    mov esi, buffer
-    mov edi, words
-
     ; Abrir el archivo de entrada
     mov eax, 5          ; sys_open
     mov ebx, input_file
@@ -35,6 +32,8 @@ _start:
     js error            ; Si hay error al leer el archivo
 
     ; Procesar el contenido del buffer
+    mov esi, buffer
+    mov edi, words
     xor ecx, ecx         ; Contador de palabras
 
 next_char:
@@ -42,31 +41,17 @@ next_char:
     mov al, [esi]
     cmp al, '#'
     je end_of_text       ; Si es '#', fin del texto
-    cmp al, '0'
-    je end_word          ; Si es '0', termina la palabra actual
-    ; Filtrar caracteres no alfabéticos
-    cmp al, 'a'
-    jb skip_char
-    cmp al, 'z'
-    ja skip_char
+    cmp al, ' '
+    je end_word          ; Si es un espacio, termina la palabra actual
     stosb                ; Almacena el carácter en el buffer de la palabra actual
     inc esi
-    ; Verificar que el índice no exceda el tamaño del buffer
-    cmp esi, buffer + buffer_size
-    jae error            ; Si excede el tamaño del buffer, ir a manejo de errores
     jmp next_char        ; Continuar al siguiente carácter
-
-skip_char:
-    inc esi
-    jmp next_char
 
 end_word:
     cmp edi, words       ; Verificar si hay una palabra vacía
     je skip_empty_word   ; Si no se almacenó nada, saltar
     stosb                ; Añadir el null byte para terminar la palabra
     inc ecx              ; Incrementar el contador de palabras
-    cmp ecx, 200
-    jae error            ; Si word_count >= 200, ir a manejo de errores
     call check_word      ; Revisar si la palabra ya existe
     jmp continue         ; Continuar al siguiente carácter
 
@@ -99,8 +84,6 @@ compare_loop:
     je word_found
     add edi, 256
     inc ebx
-    cmp ebx, 200         ; Asegurarse de que EBX no exceda 200
-    jae error            ; Si EBX >= 200, ir a manejo de errores
     cmp ebx, dword [word_count]
     jne compare_loop
 
