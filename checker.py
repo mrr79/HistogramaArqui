@@ -10,6 +10,11 @@ def count_words_in_bin_file(file_path):
             content = file.read()
             # Decodificar los bytes a una cadena de texto
             text = content.decode('utf-8')
+
+            # Verificar si el último carácter es '#', y eliminarlo si es así
+            if text.endswith('#'):
+                text = text[:-1]
+
             # Separar las palabras utilizando '0' como delimitador
             words = text.split('0')
             # Filtrar palabras vacías (en caso de que haya múltiples ceros consecutivos)

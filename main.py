@@ -1,12 +1,12 @@
-import struct
 import string
 import unicodedata
+import struct
+
 
 class tokenizer:
     def __init__(self, texto):
         self.texti = texto
         self.contenido = None
-        self.palabras = None
 
     def eliminar_acento(self, texto):
         # Normalizar el texto para descomponer caracteres acentuados
@@ -19,22 +19,29 @@ class tokenizer:
         # Procesar el texto eliminando puntuación y convirtiéndolo a minúsculas
         with open(self.texti, 'r', encoding='utf-8') as archivo:
             contenido = archivo.read()
-            # Crear una tabla de traducción para eliminar caracteres no alfabéticos
             contenido = contenido.lower()  # Convertir todo a minúsculas
             contenido = self.eliminar_acento(contenido)
-            # Eliminar cualquier carácter que no sea una letra (a-z)
+            
+            # Crear una nueva cadena solo con letras y espacios, eliminando todo lo demás
             contenido = ''.join(c for c in contenido if c.isalpha() or c.isspace())
-            contenido = ''.join(c if c.isalpha() else '0' for c in contenido)
-             # Ahora los espacios han sido reemplazados por '0'
-            self.palabras = contenido.split()  # Obtener las palabras como una lista
+            
+            # Reemplazar múltiples espacios por un solo espacio y luego cambiar los espacios por ceros
+            contenido = ' '.join(contenido.split())  # Eliminar espacios múltiples
+            contenido = contenido.replace(' ', '0')  # Reemplazar los espacios por ceros
+            contenido += '#'  # Añadir el símbolo '#' al final del texto procesado
+            self.contenido = contenido
 
     def guardar_en_binario(self):
         # Abre el archivo en modo binario para escritura
         with open('archivo_nuevo.bin', 'wb') as f:
-            for palabra in self.palabras:
-                # Codificar la palabra en utf-8 y escribir solo la palabra codificada
-                palabra_codificada = palabra.encode('utf-8')
-                f.write(palabra_codificada)
+            for palabra in self.contenido:
+                for caracter in palabra:
+                    # Convertir el carácter a su valor Unicode
+                    valor_unicode = ord(caracter)
+                    # Convertir el valor Unicode a binario (8 bits)
+                    valor_binario = struct.pack('B', valor_unicode)
+                    # Escribir el valor binario en el archivo
+                    f.write(valor_binario)
 
 # Función para abrir el cuadro de diálogo de selección de archivo
 def seleccionar_archivo():
@@ -55,7 +62,7 @@ if __name__ == "__main__":
     if archivo_txt:
         token = tokenizer(archivo_txt)
         token.procesarTexto()  # Procesa el texto y guarda las palabras
-        token.guardar_en_binario()  # Guarda las palabras en formato binario
-        print(f"Archivo {archivo_txt} procesado y guardado como archivoo_nuevo.bin")
+        token.guardar_en_binario()  # Guarda el contenido en formato binario (ASCII)
+        print(f"Archivo {archivo_txt} procesado y guardado como archivo_nuevo.bin")
     else:
         print("No se seleccionó ningún archivo.")
