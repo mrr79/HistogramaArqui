@@ -15,21 +15,24 @@ section .text
 
 _start:
     ; Abrir el archivo de entrada
-    mov eax, 5            ; sys_open
+    mov eax, 5                ; sys_open
     mov ebx, input_file
-    mov ecx, 0            ; O_RDONLY
+    mov ecx, 0                ; O_RDONLY
     int 0x80
     test eax, eax
-    js error              ; Si hay error al abrir el archivo
-    mov ebx, eax          ; Guardar el descriptor de archivo
+    js error                  ; Si hay error al abrir el archivo, ir a la etiqueta error
+    mov ebx, eax              ; Guardar el descriptor de archivo
 
-    ; Leer el contenido del archivo
-    mov eax, 3            ; sys_read
+        ; Leer el contenido del archivo
+    mov eax, 3                ; sys_read
     mov ecx, buffer
     mov edx, buffer_size
     int 0x80
     test eax, eax
-    js error              ; Si hay error al leer el archivo
+    js error                  ; Si hay error al leer el archivo
+    test eax, eax
+    jz end_of_text            ; Si no hay más datos para leer
+
 
     ; Procesar el contenido del buffer
     mov esi, buffer       ; Puntero de lectura
@@ -40,18 +43,18 @@ next_char:
     ; Leer el siguiente carácter
     mov al, [esi]
     cmp al, '#'
-    je end_of_text        ; Si es '#', fin del texto
+    je end_of_text            ; Si es '#', fin del texto
     cmp al, ' '
-    je end_word           ; Si es un espacio, termina la palabra actual
+    je end_word               ; Si es un espacio, termina la palabra actual
     test al, al
-    jz end_of_text        ; Si llegamos al final del buffer, detener
+    jz end_of_text            ; Si llegamos al final del buffer, detener
 
     ; Almacenar carácter si no es un delimitador
     cmp edi, words + max_word_size * 20  ; Verificar límite de buffer de palabras
-    jae end_word           ; Si excede el tamaño, terminar la palabra
-    stosb                 ; Almacena el carácter en el buffer de la palabra actual
+    jae end_word             ; Si excede el tamaño, terminar la palabra
+    stosb                    ; Almacenar el carácter en el buffer de la palabra actual
     inc esi
-    jmp next_char         ; Continuar al siguiente carácter
+    jmp next_char            ; Continuar al siguiente carácter
 
 end_word:
     cmp edi, words        ; Verificar si hay una palabra vacía
@@ -84,31 +87,32 @@ check_word:
 
     ; Comparar la palabra actual con las palabras almacenadas
     mov edi, words
-    xor ebx, ebx          ; Índice de palabras
-    mov edx, ecx          ; Guardar el contador de palabras
+    xor ebx, ebx              ; Índice de palabras
+    mov edx, ecx              ; Guardar el contador de palabras
 
 compare_loop:
     cmp ebx, dword [word_count] ; Comprobar si hemos alcanzado el número total de palabras
-    je new_word           ; Si no se encuentra, es una nueva palabra
+    je new_word               ; Si no se encuentra, es una nueva palabra
 
     ; Comparar palabra actual con palabras almacenadas
-    mov esi, edi          ; Cargar puntero a la palabra actual
-    repe cmpsb            ; Comparar bytes de palabras
-    je word_found         ; Si las palabras coinciden, se encontró
+    mov esi, edi              ; Cargar puntero a la palabra actual
+    repe cmpsb                ; Comparar bytes de palabras
+    je word_found             ; Si las palabras coinciden, se encontró
 
-    add edi, max_word_size  ; Mover al siguiente slot de palabra
+    add edi, max_word_size    ; Mover al siguiente slot de palabra
     inc ebx
     jmp compare_loop
 
 new_word:
     ; Si no se encontró la palabra, agregarla al array
     mov edi, words
-    add edi, ebx
+    add edi, ebx              ; Mover al siguiente slot de palabra
     mov esi, words
-    rep movsb             ; Copiar la nueva palabra
+    rep movsb                 ; Copiar la nueva palabra
     mov dword [counts + ebx * 4], 1
     inc dword [word_count]
     jmp restore_registers
+
 
 word_found:
     ; Si se encontró la palabra, incrementar su contador
@@ -125,36 +129,45 @@ restore_registers:
 
 end_of_text:
     ; Abrir el archivo de salida
-    mov eax, 5            ; sys_open
+    mov eax, 5                ; sys_open
     mov ebx, output_file
-    mov ecx, 577          ; O_WRONLY | O_CREAT | O_TRUNC
-    mov edx, 438          ; 0666 en octal
+    mov ecx, 577              ; O_WRONLY | O_CREAT | O_TRUNC
+    mov edx, 438              ; 0666 en octal
     int 0x80
     test eax, eax
-    js error              ; Si hay error al abrir el archivo
-    mov ebx, eax          ; Guardar el descriptor de archivo
+    js error                  ; Si hay error al abrir el archivo
+    mov ebx, eax              ; Guardar el descriptor de archivo
 
     ; Escribir los resultados en el archivo de salida
-    xor ecx, ecx          ; Reiniciar el contador de palabras
+    xor ecx, ecx              ; Reiniciar el contador de palabras
+
 write_loop:
     cmp ecx, dword [word_count]
     je done
     mov esi, words
-    add esi, ecx
-    mov edi, buffer       ; Puntero para el buffer de salida
-    rep movsb             ; Copiar la palabra al buffer de salida
+
+    ; Multiplicar ecx por max_word_size
+    mov eax, ecx              ; Guardar ecx en eax para hacer la multiplicación
+    imul eax, max_word_size   ; eax = ecx * max_word_size
+
+    ; Sumar el resultado a esi
+    add esi, eax              ; Ahora esi tiene la dirección correcta de la palabra
+
+    mov edi, buffer           ; Puntero para el buffer de salida
+    rep movsb                 ; Copiar la palabra al buffer de salida
     mov al, ':'
-    stosb                 ; Añadir ':' después de la palabra
+    stosb                     ; Añadir ':' después de la palabra
     mov eax, [counts + ecx * 4]
-    call int_to_str       ; Convertir el número en cadena
-    mov al, 10            ; Añadir '\n'
+    call int_to_str           ; Convertir el número en cadena
+    mov al, 10                ; Añadir '\n'
     stosb
-    mov eax, 4            ; sys_write
+    mov eax, 4                ; sys_write
     mov edx, edi
     sub edx, buffer
     int 0x80
     inc ecx
     jmp write_loop
+
 
 int_to_str:
     ; Convertir un entero a cadena (decimal)
@@ -164,21 +177,28 @@ int_to_str:
     push edx
 
     ; Inicializar punteros y variables
-    mov ebx, 10
-    xor ecx, ecx
-    xor edx, edx
+    mov ebx, 10             ; Asegúrate de que el divisor es 10
+    xor ecx, ecx            ; Contador de dígitos
 
 convert_loop:
-    div ebx
-    add dl, '0'
-    push dx
-    inc ecx
-    test eax, eax
-    jnz convert_loop
+    xor edx, edx            ; Limpia edx antes de la división
+
+    test eax, eax           ; Verifica si eax es 0
+    jz done_convert_loop    ; Si eax es 0, sal del bucle
+
+    div ebx                 ; Divide edx:eax por 10 (ebx contiene 10)
+    add dl, '0'             ; Convertir el resto en carácter
+    push dx                 ; Almacenar el carácter en la pila
+    inc ecx                 ; Incrementar el contador de dígitos
+    jmp convert_loop        ; Repetir hasta que eax sea 0
+
+
+done_convert_loop:
+    ; Extraer los caracteres de la pila
 
 extract_loop:
     pop dx
-    mov [edi], dl
+    mov [edi], dl           ; Almacenar el carácter en la cadena
     inc edi
     loop extract_loop
 
@@ -199,3 +219,4 @@ error:
     mov eax, 1
     mov ebx, -1
     int 0x80
+
